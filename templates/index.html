@@ -30,6 +30,12 @@
 
     <!-- Input -->
     <section class="input-section">
+      <!-- Mode selector -->
+      <div class="mode-selector">
+        <button class="mode-btn active" id="mode-anime" onclick="setMode('anime')">🎬 動漫模式</button>
+        <button class="mode-btn" id="mode-song" onclick="setMode('song')">🎵 歌曲模式</button>
+      </div>
+      <div class="mode-hint" id="mode-hint">20 單字 ＋ 10 文法例句</div>
       <div class="url-row">
         <input type="url" id="youtube-url"
                placeholder="貼上 YouTube 動漫影片網址，例如 https://www.youtube.com/watch?v=..."
@@ -79,10 +85,23 @@
         </div>
       </div>
 
-      <!-- Grammar -->
-      <div class="card">
+      <!-- Grammar (anime mode) -->
+      <div class="card" id="grammar-card">
         <h3>📝 文法 <span class="badge" id="grammar-count"></span></h3>
         <div id="grammar-list"></div>
+      </div>
+
+      <!-- Lyrics (song mode) -->
+      <div class="card hidden" id="lyrics-card">
+        <h3>🎵 歌詞 <span class="badge" id="lyrics-count"></span></h3>
+        <div class="table-wrapper">
+          <table id="lyrics-table">
+            <thead>
+              <tr><th>歌詞</th><th>讀音</th><th>中文</th></tr>
+            </thead>
+            <tbody id="lyrics-body"></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </div>

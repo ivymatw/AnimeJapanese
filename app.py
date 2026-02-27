@@ -15,7 +15,7 @@ import anthropic
 
 app = Flask(__name__)
 
-SYSTEM_PROMPT = """你是日文學習助手，專門從日本動漫對白中選取適合 N2 程度以上的學習素材。
+SYSTEM_PROMPT_ANIME = """你是日文學習助手，專門從日本動漫對白中選取適合 N2 程度以上的學習素材。
 
 請從以下動漫字幕中：
 1. 選出 20 個 N2 以上程度的重要單字（避免太基礎的 N5/N4 單字）
@@ -33,6 +33,29 @@ SYSTEM_PROMPT = """你是日文學習助手，專門從日本動漫對白中選�
   ],
   "grammar": [
     {"japanese": "例句原文", "reading": "", "chinese": "繁體中文翻譯", "notes": "文法重點：〜文法型"}
+  ]
+}
+
+只回傳 JSON，不要其他文字。"""
+
+SYSTEM_PROMPT_SONG = """你是日文學習助手，專門從日文歌曲歌詞中整理學習素材。
+
+請從以下歌詞中：
+1. 整理出歌詞全文（每行一句，去除重複段落標記，保持原始日文）
+2. 選出 20 個值得學習的重要單字（包含歌詞中具詩意或常用的詞）
+
+要求：
+- 歌詞以行為單位，每行一個 item（japanese=歌詞原文，reading=讀音，chinese=整行翻譯，notes=空白）
+- 單字需提供假名讀音和繁體中文翻譯
+- 翻譯使用繁體中文
+- 以 JSON 格式回傳，格式如下：
+
+{
+  "lyrics": [
+    {"japanese": "歌詞一行", "reading": "よみかた", "chinese": "繁體中文翻譯", "notes": ""}
+  ],
+  "vocabulary": [
+    {"japanese": "単語", "reading": "たんご", "chinese": "單字", "notes": "詞性說明"}
   ]
 }
 
@@ -142,8 +165,8 @@ def parse_subtitle_file(filepath: str) -> str:
     return "\n".join(lines)
 
 
-def call_claude(subtitle_text: str, api_key: str) -> dict:
-    """Send subtitle text to Claude and get vocabulary + grammar JSON."""
+def call_claude(subtitle_text: str, api_key: str, mode: str = "anime") -> dict:
+    """Send subtitle text to Claude and get learning content JSON."""
     client = anthropic.Anthropic(api_key=api_key)
 
     # Limit subtitle length to avoid token overflow
@@ -151,13 +174,18 @@ def call_claude(subtitle_text: str, api_key: str) -> dict:
     if len(subtitle_text) > max_chars:
         subtitle_text = subtitle_text[:max_chars] + "\n...(字幕截斷)"
 
+    if mode == "song":
+        system = SYSTEM_PROMPT_SONG
+        user_msg = f"以下是日文歌曲歌詞：\n\n{subtitle_text}"
+    else:
+        system = SYSTEM_PROMPT_ANIME
+        user_msg = f"以下是動漫字幕內容：\n\n{subtitle_text}"
+
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": f"以下是動漫字幕內容：\n\n{subtitle_text}"}
-        ]
+        system=system,
+        messages=[{"role": "user", "content": user_msg}]
     )
 
     text = message.content[0].text.strip()
@@ -167,15 +195,24 @@ def call_claude(subtitle_text: str, api_key: str) -> dict:
     return json.loads(text)
 
 
-def build_nihongocards(title: str, data: dict) -> dict:
+def build_nihongocards(title: str, data: dict, mode: str = "anime") -> dict:
     """Build .nihongocards JSON structure."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return {
-        "version": 1,
-        "type": "group",
-        "title": f"AnimeJapanese - {title}",
-        "exportedAt": now,
-        "tables": [
+    if mode == "song":
+        tables = [
+            {
+                "title": f"歌詞 - {title}",
+                "bookType": "grammar",   # grammar type = sentence cards
+                "items": data.get("lyrics", [])
+            },
+            {
+                "title": f"單字 - {title}",
+                "bookType": "vocabulary",
+                "items": data.get("vocabulary", [])
+            }
+        ]
+    else:
+        tables = [
             {
                 "title": f"單字 - {title}",
                 "bookType": "vocabulary",
@@ -187,6 +224,12 @@ def build_nihongocards(title: str, data: dict) -> dict:
                 "items": data.get("grammar", [])
             }
         ]
+    return {
+        "version": 1,
+        "type": "group",
+        "title": f"AnimeJapanese - {title}",
+        "exportedAt": now,
+        "tables": tables
     }
 
 
@@ -200,6 +243,7 @@ def analyze():
     body = request.get_json(silent=True) or {}
     url = body.get("url", "").strip()
     api_key = get_api_key(body)
+    mode = body.get("mode", "anime")  # "anime" or "song"
 
     if not url:
         return jsonify({"error": "請提供 YouTube URL"}), 400
@@ -217,7 +261,7 @@ def analyze():
 
         # Step 2: Call Claude
         try:
-            data = call_claude(subtitle_text, api_key)
+            data = call_claude(subtitle_text, api_key, mode=mode)
         except anthropic.AuthenticationError:
             return jsonify({"error": "API Key 無效，請確認 Anthropic API Key 正確。"}), 401
         except anthropic.RateLimitError:
@@ -228,12 +272,14 @@ def analyze():
             return jsonify({"error": f"AI 分析失敗：{str(e)}"}), 500
 
         # Step 3: Build nihongocards
-        cards = build_nihongocards(video_title, data)
+        cards = build_nihongocards(video_title, data, mode=mode)
 
         resp = jsonify({
             "title": video_title,
+            "mode": mode,
             "vocabulary": data.get("vocabulary", []),
             "grammar": data.get("grammar", []),
+            "lyrics": data.get("lyrics", []),
             "nihongocards": cards
         })
         resp.headers["Cache-Control"] = "no-store"

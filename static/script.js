@@ -2,6 +2,23 @@
 
 const LS_KEY = "animejapanese_api_key";
 let currentCards = null;
+let currentMode = "anime";
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById("mode-anime").classList.toggle("active", mode === "anime");
+  document.getElementById("mode-song").classList.toggle("active", mode === "song");
+  const hint = document.getElementById("mode-hint");
+  const urlInput = document.getElementById("youtube-url");
+  if (mode === "song") {
+    hint.textContent = "歌詞全文 ＋ 20 重要單字";
+    urlInput.placeholder = "貼上 YouTube 日文歌曲網址，例如 https://www.youtube.com/watch?v=...";
+  } else {
+    hint.textContent = "20 單字 ＋ 10 文法例句";
+    urlInput.placeholder = "貼上 YouTube 動漫影片網址，例如 https://www.youtube.com/watch?v=...";
+  }
+  hideResults();
+}
 
 // ── Init ──────────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
@@ -40,7 +57,7 @@ async function analyze() {
     const res = await fetch("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, api_key: apiKey }),
+      body: JSON.stringify({ url, api_key: apiKey, mode: currentMode }),
     });
 
     if (res.status === 202 || res.ok) {
@@ -78,9 +95,11 @@ async function analyze() {
 
 // ── Render ────────────────────────────────────────────
 function renderResults(data) {
-  document.getElementById("video-title-display").textContent = `🎬 ${data.title}`;
+  const mode = data.mode || "anime";
+  const icon = mode === "song" ? "🎵" : "🎬";
+  document.getElementById("video-title-display").textContent = `${icon} ${data.title}`;
 
-  // Vocabulary table
+  // Vocabulary table (both modes)
   const tbody = document.getElementById("vocab-body");
   tbody.innerHTML = "";
   (data.vocabulary || []).forEach(item => {
@@ -95,20 +114,42 @@ function renderResults(data) {
   });
   document.getElementById("vocab-count").textContent = `${(data.vocabulary || []).length} 個`;
 
-  // Grammar list
-  const grammarDiv = document.getElementById("grammar-list");
-  grammarDiv.innerHTML = "";
-  (data.grammar || []).forEach((item, i) => {
-    const el = document.createElement("div");
-    el.className = "grammar-item";
-    el.innerHTML = `
-      <div class="grammar-jp">${i + 1}. ${esc(item.japanese)}</div>
-      <div class="grammar-cn">📖 ${esc(item.chinese)}</div>
-      ${item.notes ? `<span class="grammar-note">💡 ${esc(item.notes)}</span>` : ""}
-    `;
-    grammarDiv.appendChild(el);
-  });
-  document.getElementById("grammar-count").textContent = `${(data.grammar || []).length} 句`;
+  if (mode === "song") {
+    // Show lyrics, hide grammar
+    document.getElementById("grammar-card").classList.add("hidden");
+    document.getElementById("lyrics-card").classList.remove("hidden");
+
+    const lyricsBody = document.getElementById("lyrics-body");
+    lyricsBody.innerHTML = "";
+    (data.lyrics || []).forEach(item => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(item.japanese)}</td>
+        <td>${esc(item.reading)}</td>
+        <td>${esc(item.chinese)}</td>
+      `;
+      lyricsBody.appendChild(tr);
+    });
+    document.getElementById("lyrics-count").textContent = `${(data.lyrics || []).length} 行`;
+  } else {
+    // Show grammar, hide lyrics
+    document.getElementById("grammar-card").classList.remove("hidden");
+    document.getElementById("lyrics-card").classList.add("hidden");
+
+    const grammarDiv = document.getElementById("grammar-list");
+    grammarDiv.innerHTML = "";
+    (data.grammar || []).forEach((item, i) => {
+      const el = document.createElement("div");
+      el.className = "grammar-item";
+      el.innerHTML = `
+        <div class="grammar-jp">${i + 1}. ${esc(item.japanese)}</div>
+        <div class="grammar-cn">📖 ${esc(item.chinese)}</div>
+        ${item.notes ? `<span class="grammar-note">💡 ${esc(item.notes)}</span>` : ""}
+      `;
+      grammarDiv.appendChild(el);
+    });
+    document.getElementById("grammar-count").textContent = `${(data.grammar || []).length} 句`;
+  }
 
   document.getElementById("results-section").classList.remove("hidden");
 }
