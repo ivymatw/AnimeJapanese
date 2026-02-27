@@ -175,3 +175,37 @@ The `.nihongocards` file is a JSON file importable into the NihongoCards iOS app
 | Port | Env var `PORT` (default: 5001) |
 | Claude model | `claude-opus-4-5` (hardcoded, change in app.py) |
 | Max subtitle length | 8000 chars (configurable in app.py) |
+
+---
+
+## 測試
+
+### 執行方式
+
+```bash
+# 安裝 pytest
+pip3 install pytest
+
+# 跑所有單元/整合測試（不需要 API Key 或網路）
+python3 -m pytest tests/ -v
+
+# 跑真實 YouTube 下載測試（需要 Chrome 登入 + 網路）
+RUN_LIVE_TESTS=1 python3 -m pytest tests/ -v
+```
+
+### 測試涵蓋範圍
+
+| 測試類 | 項目 | 說明 |
+|---|---|---|
+| `TestParseSubtitleFile` | 4 tests | VTT 解析、去重、HTML 清除、空檔案 |
+| `TestBuildNihongocards` | 4 tests | JSON 結構、單字表、文法表、序列化 |
+| `TestFlaskEndpoints` | 5 tests | URL/Key 驗證、字幕缺失、成功回應（mock） |
+| `TestLiveSubtitleDownload` | 1 test (skip) | 真實 YouTube 下載（`RUN_LIVE_TESTS=1` 啟用） |
+
+**目前狀態：14 passed, 1 skipped**
+
+### 測試策略
+
+- **單元測試**：mock 掉 yt-dlp 和 Claude API，純邏輯驗證
+- **Live test**：用環境變數 `RUN_LIVE_TESTS=1` 開啟，驗證真實字幕下載流程
+- **CI 注意**：`TestLiveSubtitleDownload` 需要 Chrome cookies，不適合在 CI 環境跑

@@ -120,3 +120,12 @@ loading
   → [success] → results
   → [error] → error (→ idle on next attempt)
 ```
+
+---
+
+## 測試設計原則
+
+- **快速為主**：mock 掉外部依賴（yt-dlp、Claude），單元測試 < 1 秒完成
+- **Live test 隔離**：真實網路測試用環境變數控制，不污染 CI
+- **黑盒整合**：Flask endpoint 測試模擬真實 HTTP 請求，驗證完整 request/response 流程
+- **測試即文件**：每個測試名稱即為功能說明，`test_dedup_repeated_lines` = 字幕重複行自動去重
