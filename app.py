@@ -69,6 +69,7 @@ def download_subtitles(url: str, tmpdir: str) -> tuple[str | None, str | None]:
         "--convert-subs", "vtt",
         "-o", base_path,
         "--no-warnings",
+        "--no-playlist",          # only download the specific video, not entire playlist
         "--cookies-from-browser", "chrome",
     ]
 
@@ -229,12 +230,14 @@ def analyze():
         # Step 3: Build nihongocards
         cards = build_nihongocards(video_title, data)
 
-        return jsonify({
+        resp = jsonify({
             "title": video_title,
             "vocabulary": data.get("vocabulary", []),
             "grammar": data.get("grammar", []),
             "nihongocards": cards
         })
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
 
 if __name__ == "__main__":
