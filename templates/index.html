@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnimeJapanese 🎌</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>AnimeJapanese 🎌</h1>
+      <p class="subtitle">從動漫學日文 — 自動從 YouTube 動漫字幕提取 N2+ 學習素材</p>
+    </header>
+
+    <!-- Settings -->
+    <section class="settings-panel">
+      <details>
+        <summary>⚙️ 設定 (Anthropic API Key)</summary>
+        <div class="settings-body">
+          <label for="api-key">Anthropic API Key</label>
+          <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" />
+          <button class="btn-secondary" onclick="saveKey()">儲存</button>
+          <p class="hint">Key 儲存於本機 localStorage，不會上傳伺服器。<br>
+            若伺服器已設定 <code>ANTHROPIC_API_KEY</code> 環境變數則可留空。</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- Input -->
+    <section class="input-section">
+      <div class="url-row">
+        <input type="url" id="youtube-url"
+               placeholder="貼上 YouTube 動漫影片網址，例如 https://www.youtube.com/watch?v=..."
+               onkeydown="if(event.key==='Enter') analyze()" />
+        <button class="btn-primary" id="analyze-btn" onclick="analyze()">分析字幕</button>
+      </div>
+    </section>
+
+    <!-- Status -->
+    <section id="status-section" class="status-section hidden">
+      <div class="status-box">
+        <span class="spinner"></span>
+        <span id="status-text">處理中...</span>
+      </div>
+    </section>
+
+    <!-- Error -->
+    <section id="error-section" class="error-section hidden">
+      <div class="error-box">
+        <span>❌</span>
+        <span id="error-text"></span>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results-section" class="results-section hidden">
+      <div class="results-header">
+        <h2 id="video-title-display"></h2>
+        <button class="btn-download" onclick="downloadCards()">⬇️ 下載 .nihongocards 檔案</button>
+      </div>
+
+      <!-- Vocabulary -->
+      <div class="card">
+        <h3>📚 單字 <span class="badge" id="vocab-count"></span></h3>
+        <div class="table-wrapper">
+          <table id="vocab-table">
+            <thead>
+              <tr>
+                <th>日文</th>
+                <th>讀音</th>
+                <th>中文</th>
+                <th>備注</th>
+              </tr>
+            </thead>
+            <tbody id="vocab-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Grammar -->
+      <div class="card">
+        <h3>📝 文法 <span class="badge" id="grammar-count"></span></h3>
+        <div id="grammar-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
