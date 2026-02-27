@@ -151,7 +151,7 @@ def call_claude(subtitle_text: str, api_key: str) -> dict:
         subtitle_text = subtitle_text[:max_chars] + "\n...(字幕截斷)"
 
     message = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-5",
         max_tokens=2048,
         system=SYSTEM_PROMPT,
         messages=[
