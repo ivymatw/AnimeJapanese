@@ -152,7 +152,7 @@ def call_claude(subtitle_text: str, api_key: str) -> dict:
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2048,
+        max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[
             {"role": "user", "content": f"以下是動漫字幕內容：\n\n{subtitle_text}"}
