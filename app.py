@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """AnimeJapanese - Flask backend for extracting Japanese learning content from anime subtitles."""
 
+from __future__ import annotations
 import os
 import re
 import json
@@ -51,47 +52,55 @@ def download_subtitles(url: str, tmpdir: str) -> tuple[str | None, str | None]:
     Try to download Japanese subtitles. Returns (subtitle_text, video_title) or (None, None).
     Tries official subs first, then auto-generated.
     """
-    base_path = os.path.join(tmpdir, "sub")
+    # Use %(title)s so the filename contains the video title
+    base_path = os.path.join(tmpdir, "%(title)s")
 
-    # Common yt-dlp args
+    # Use Python 3.9 yt-dlp (Homebrew 2026.x has JS runtime issues with YouTube)
+    import shutil
+    ytdlp_bin = "/Users/ivyma/Library/Python/3.9/bin/yt-dlp"
+    if not Path(ytdlp_bin).exists():
+        ytdlp_bin = shutil.which("yt-dlp") or "yt-dlp"
+
+    # Common yt-dlp args (no --print title — it prevents subtitle file creation)
     common_args = [
-        "yt-dlp",
+        ytdlp_bin,
         "--skip-download",
         "--sub-lang", "ja",
         "--convert-subs", "vtt",
         "-o", base_path,
-        "--print", "title",
         "--no-warnings",
+        "--cookies-from-browser", "chrome",
     ]
 
+    def run_and_check(extra_args):
+        """Run yt-dlp, return (subtitle_text, title) or (None, None)."""
+        try:
+            subprocess.run(common_args + extra_args + [url],
+                capture_output=True, text=True, timeout=60)
+            vtt_files = list(Path(tmpdir).glob("*.vtt"))
+            if vtt_files:
+                # Extract title from filename: "Title.ja.vtt" → "Title"
+                stem = vtt_files[0].stem  # e.g. "葬送的芙莉蓮 第29話.ja"
+                title = stem.rsplit(".", 1)[0] if "." in stem else stem
+                return parse_subtitle_file(str(vtt_files[0])), title
+        except Exception:
+            pass
+        return None, None
+
     # Try 1: official subs
-    try:
-        result = subprocess.run(
-            common_args + ["--write-sub", url],
-            capture_output=True, text=True, timeout=60
-        )
-        title = result.stdout.strip().split('\n')[0] if result.stdout.strip() else "Unknown"
-        vtt_files = list(Path(tmpdir).glob("*.vtt"))
-        if vtt_files:
-            return parse_subtitle_file(str(vtt_files[0])), title
-    except Exception:
-        pass
+    text, title = run_and_check(["--write-sub"])
+    if text:
+        return text, title
 
     # Try 2: auto-generated subs
-    try:
-        result = subprocess.run(
-            common_args + ["--write-auto-sub", url],
-            capture_output=True, text=True, timeout=60
-        )
-        title = result.stdout.strip().split('\n')[0] if result.stdout.strip() else "Unknown"
-        vtt_files = list(Path(tmpdir).glob("*.vtt"))
-        if vtt_files:
-            return parse_subtitle_file(str(vtt_files[0])), title
-        srt_files = list(Path(tmpdir).glob("*.srt"))
-        if srt_files:
-            return parse_subtitle_file(str(srt_files[0])), title
-    except Exception:
-        pass
+    text, title = run_and_check(["--write-auto-sub"])
+    if text:
+        return text, title
+
+    # Try 3: both together
+    text, title = run_and_check(["--write-sub", "--write-auto-sub"])
+    if text:
+        return text, title
 
     return None, None
 
